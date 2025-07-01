@@ -11,7 +11,7 @@ app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
 
-// Conexión a la base de datos
+// Función para conectarse a la base de datos
 async function getConnection() {
   const datosConexion = {
     host: "192.168.1.135",
@@ -59,7 +59,7 @@ app.post("/frases", async (req, res) => {
 
     res.status(201).json({ success: true, id: result.insertId });
   } catch (err) {
-    console.log(err);
+    console.error(err);
     res.status(500).json({ success: false, message: "Error al insertar frase" });
   }
 });
@@ -127,5 +127,59 @@ app.get("/frases/:id", async (req, res) => {
   } catch (err) {
     console.error("Error al obtener la frase:", err);
     res.status(500).json({ success: false, message: "Error al obtener la frase" });
+  }
+});
+
+// PUT /frases/:id - Actualizar una frase existente
+app.put("/frases/:id", async (req, res) => {
+  const fraseId = req.params.id;
+  const { texto, marca_tiempo, descripcion, personaje_id, capitulo_id } = req.body;
+
+  if (!texto || !personaje_id) {
+    return res.status(400).json({
+      success: false,
+      message: "El texto y el ID del personaje son obligatorios",
+    });
+  }
+
+  try {
+    const conn = await getConnection();
+
+    const [frase] = await conn.execute("SELECT id FROM frases WHERE id = ?", [fraseId]);
+
+    if (frase.length === 0) {
+      await conn.end();
+      return res.status(404).json({ success: false, message: "Frase no encontrada" });
+    }
+
+    await conn.execute(
+      `
+      UPDATE frases
+      SET texto = ?,
+          marca_tiempo = ?,
+          descripcion = ?,
+          personaje_id = ?,
+          capitulo_id = ?
+      WHERE id = ?
+      `,
+      [
+        texto,
+        marca_tiempo || null,
+        descripcion || null,
+        personaje_id,
+        capitulo_id || null,
+        fraseId,
+      ]
+    );
+
+    await conn.end();
+
+    res.status(200).json({
+      success: true,
+      message: "Frase actualizada correctamente"
+    });
+  } catch (err) {
+    console.error("Error al actualizar la frase:", err);
+    res.status(500).json({ success: false, message: "Error al actualizar la frase" });
   }
 });
