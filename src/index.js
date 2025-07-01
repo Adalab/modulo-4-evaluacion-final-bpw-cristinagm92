@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const mysql = require("mysql2/promise");
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -24,10 +25,12 @@ async function getConnection() {
   return conexion;
 }
 
+// Ruta principal
 app.get("/", (req, res) => {
   res.send("¡Bienvenida a la API de simpsom!");
 });
 
+// POST /frases - Insertar una nueva frase
 app.post("/frases", async (req, res) => {
   const { texto, marca_tiempo, descripcion, personaje_id, capitulo_id } =
     req.body;
@@ -56,10 +59,36 @@ app.post("/frases", async (req, res) => {
 
     res.status(201).json({ success: true, id: result.insertId });
   } catch (err) {
-    console.log(err)
-    
-    res
-      .status(500)
-      .json({ success: false, message: "Error al insertar frase" });
+    console.log(err);
+
+    res.status(500).json({ success: false, message: "Error al insertar frase" });
+  }
+});
+
+// GET /frases - Listar todas las frases con info de personaje y capítulo
+app.get("/frases", async (req, res) => {
+    console.log("GET /frases ejecutado");
+  try {
+    const conn = await getConnection();
+    const [rows] = await conn.execute(`
+      SELECT 
+        f.id,
+        f.texto,
+        f.marca_tiempo,
+        f.descripcion,
+        p.id AS personaje_id,
+        CONCAT(p.nombre, ' ', p.apellido) AS personaje,
+        c.id AS capitulo_id,
+        c.titulo AS capitulo_titulo
+      FROM frases f
+      JOIN personajes p ON f.personaje_id = p.id
+      LEFT JOIN capitulos c ON f.capitulo_id = c.id
+    `);
+    await conn.end();
+
+    res.status(200).json({ success: true, frases: rows });
+  } catch (err) {
+    console.error("Error al obtener frases:", err);
+    res.status(500).json({ success: false, message: "Error al obtener frases" });
   }
 });
