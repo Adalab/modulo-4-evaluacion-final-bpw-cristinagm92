@@ -11,6 +11,7 @@ app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
 
+// Conexión a la base de datos
 async function getConnection() {
   const datosConexion = {
     host: "192.168.1.135",
@@ -32,8 +33,7 @@ app.get("/", (req, res) => {
 
 // POST /frases - Insertar una nueva frase
 app.post("/frases", async (req, res) => {
-  const { texto, marca_tiempo, descripcion, personaje_id, capitulo_id } =
-    req.body;
+  const { texto, marca_tiempo, descripcion, personaje_id, capitulo_id } = req.body;
 
   if (!texto || !personaje_id) {
     return res.status(400).json({
@@ -60,14 +60,14 @@ app.post("/frases", async (req, res) => {
     res.status(201).json({ success: true, id: result.insertId });
   } catch (err) {
     console.log(err);
-
     res.status(500).json({ success: false, message: "Error al insertar frase" });
   }
 });
 
-// GET /frases - Listar todas las frases con info de personaje y capítulo
+// GET /frases - Listar todas las frases
 app.get("/frases", async (req, res) => {
-    console.log("GET /frases ejecutado");
+  console.log("GET /frases ejecutado");
+
   try {
     const conn = await getConnection();
     const [rows] = await conn.execute(`
@@ -90,5 +90,42 @@ app.get("/frases", async (req, res) => {
   } catch (err) {
     console.error("Error al obtener frases:", err);
     res.status(500).json({ success: false, message: "Error al obtener frases" });
+  }
+});
+
+// GET /frases/:id - Obtener una frase específica
+app.get("/frases/:id", async (req, res) => {
+  const fraseId = req.params.id;
+
+  try {
+    const conn = await getConnection();
+    const [rows] = await conn.execute(
+      `
+      SELECT 
+        f.id,
+        f.texto,
+        f.marca_tiempo,
+        f.descripcion,
+        p.id AS personaje_id,
+        CONCAT(p.nombre, ' ', p.apellido) AS personaje,
+        c.id AS capitulo_id,
+        c.titulo AS capitulo_titulo
+      FROM frases f
+      JOIN personajes p ON f.personaje_id = p.id
+      LEFT JOIN capitulos c ON f.capitulo_id = c.id
+      WHERE f.id = ?
+      `,
+      [fraseId]
+    );
+    await conn.end();
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, message: "Frase no encontrada" });
+    }
+
+    res.status(200).json({ success: true, frase: rows[0] });
+  } catch (err) {
+    console.error("Error al obtener la frase:", err);
+    res.status(500).json({ success: false, message: "Error al obtener la frase" });
   }
 });
