@@ -11,7 +11,7 @@ app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
 
-// Función para conectarse a la base de datos
+// Conexión a la base de datos
 async function getConnection() {
   const datosConexion = {
     host: "192.168.1.135",
@@ -66,8 +66,6 @@ app.post("/frases", async (req, res) => {
 
 // GET /frases - Listar todas las frases
 app.get("/frases", async (req, res) => {
-  console.log("GET /frases ejecutado");
-
   try {
     const conn = await getConnection();
     const [rows] = await conn.execute(`
@@ -155,31 +153,53 @@ app.put("/frases/:id", async (req, res) => {
     await conn.execute(
       `
       UPDATE frases
-      SET texto = ?,
-          marca_tiempo = ?,
-          descripcion = ?,
-          personaje_id = ?,
-          capitulo_id = ?
+      SET texto = ?, marca_tiempo = ?, descripcion = ?, personaje_id = ?, capitulo_id = ?
       WHERE id = ?
       `,
-      [
-        texto,
-        marca_tiempo || null,
-        descripcion || null,
-        personaje_id,
-        capitulo_id || null,
-        fraseId,
-      ]
+      [texto, marca_tiempo || null, descripcion || null, personaje_id, capitulo_id || null, fraseId]
     );
 
     await conn.end();
 
     res.status(200).json({
       success: true,
-      message: "Frase actualizada correctamente"
+      message: "Frase actualizada correctamente",
     });
   } catch (err) {
     console.error("Error al actualizar la frase:", err);
     res.status(500).json({ success: false, message: "Error al actualizar la frase" });
+  }
+});
+
+// DELETE /frases/:id - Eliminar una frase existente
+app.delete("/frases/:id", async (req, res) => {
+  const fraseId = req.params.id;
+
+  try {
+    const conn = await getConnection();
+
+    const [resultado] = await conn.execute("SELECT id FROM frases WHERE id = ?", [fraseId]);
+
+    if (resultado.length === 0) {
+      await conn.end();
+      return res.status(404).json({
+        success: false,
+        message: "Frase no encontrada",
+      });
+    }
+
+    await conn.execute("DELETE FROM frases WHERE id = ?", [fraseId]);
+    await conn.end();
+
+    res.status(200).json({
+      success: true,
+      message: `Frase con ID ${fraseId} eliminada correctamente.`,
+    });
+  } catch (err) {
+    console.error("Error al eliminar frase:", err);
+    res.status(500).json({
+      success: false,
+      message: "Error al eliminar la frase",
+    });
   }
 });
